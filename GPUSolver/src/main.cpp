@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <memory>
 
+// cuda stuff
+#include <nvml.h>
 
 #include "include/IO.hpp"
 #include "include/model.hpp"
@@ -32,18 +34,32 @@ int main(int argc, char* argv[])  {
     model_name = (argc > 1 ? argv[1] : "Sphere_00");
     write_matrix = (argc > 2 ? (std::string(argv[2]) == "1" ? true : false) : false);
 
+
+    nvmlInit();
+
+    nvmlDevice_t device;
+    nvmlDeviceGetHandleByIndex(0, &device);
+    unsigned long long energy_start{0}, energy_end{0};
+
+    // read input
     ReadVTK(model_name, poissfem_model);
 
 
+
+
+    //******************************************
+    //*  Assembly part
+    //******************************************
     auto assemble_begin = std::chrono::steady_clock::now();
     initialize_CSR_indices<index_type, value_type>(poissfem_model, A);
     fill_FEM_CSR<index_type, value_type>(poissfem_model, A, b);
     auto assemble_end = std::chrono::steady_clock::now();
     long assemble_time = std::chrono::duration_cast<std::chrono::microseconds>(assemble_end - assemble_begin).count();
+    
+
     //******************************************
     //*  Solver part in ginkgo :)
     //******************************************
-
     std::shared_ptr<gko::Executor> exec;
     if (gko::CudaExecutor::get_num_devices() > 0) {
         exec = gko::CudaExecutor::create(0, gko::ReferenceExecutor::create());
@@ -112,15 +128,18 @@ int main(int argc, char* argv[])  {
         .on(exec);
 
 
+
     auto solver = solver_gen->generate(gko_A);
 
 
     exec->synchronize();
 
+    nvmlDeviceGetTotalEnergyConsumption(device, &energy_start);
     auto solve_start = std::chrono::steady_clock::now();
     solver->apply(gko_b, gko_x);
     exec->synchronize();
     auto solve_end = std::chrono::steady_clock::now();
+    nvmlDeviceGetTotalEnergyConsumption(device, &energy_end);
 
 
     long transfer_time = std::chrono::duration_cast<std::chrono::microseconds>(transfer_end - transfer_start).count();
@@ -236,6 +255,8 @@ int main(int argc, char* argv[])  {
     Report<index_type, value_type> run_report{poissfem_model.n_vertices, A.n_nonzero, max_edge_length, l2_error, assemble_time, transfer_time, solve_time};
 
 
+    double energy_joules = (energy_end - energy_start) / 1000.0;
+    std::cout << "Total energy consumption during solve: " << energy_joules << " Joules" << std::endl;
     print_report<index_type, value_type>(model_name, run_report, "");
 
     write_vtu<index_type, value_type>(model_name, poissfem_model);
