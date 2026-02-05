@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED OFF)
 
 set(TARGET_EXE "poissfem")
-set(SOURCES src/main.cpp src/IO.cpp src/ComputeModel.cpp)
+set(SOURCES src/main.cpp src/IO.cpp src/ComputeModel.cpp src/Solver.cpp)
 
 add_executable(${TARGET_EXE} ${SOURCES})
 

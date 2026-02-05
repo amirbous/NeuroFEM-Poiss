@@ -23,9 +23,9 @@
 Problem: 3d Poisson:  -∇²φ = f  in Ω
                          φ = g  on ∂Ω
 
-            φ = 5 * (1 - x² - y² - z²) on ∂Ω
-            f = 30
-            g = 5 * (1 - x² - y² - z²)
+            φ = ALPHA * (BETA - x² - y² - z²) on ∂Ω
+            f = FORCING_TERM  in Ω
+            g = ALPHA * (BETA - x² - y² - z²)
 
             ∂Ω is the outside surface of complex volumetric mesh
             Ω is the inner volume of the mesh
@@ -37,6 +37,10 @@ Problem: 3d Poisson:  -∇²φ = f  in Ω
  * FEM first order tetrahedral elements derivation
  * 
  * *************************************************/
+
+#define FORCING_TERM 7.2f
+#define ALPHA 0.00048f
+#define BETA 25.0f
 
 template<typename T_value>
 T_value analytical_solution(T_value x, T_value y, T_value z) {

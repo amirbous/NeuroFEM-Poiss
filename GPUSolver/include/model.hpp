@@ -4,6 +4,8 @@
 
 #include <vector>
 
+#include <cstdint>
+
 
 template<typename T_index, typename T_value>
 struct Vertex {
@@ -74,6 +76,13 @@ struct Face {
 
 };
 
+
+struct simple_logger {
+    long transfer_duration;
+    long solve_duration;
+    float energy_joules;
+
+};
 
 
 template<typename T_index>
@@ -171,6 +180,7 @@ struct Report {
         T_index n_nonzero;
         T_value max_edge_length;
         T_value residual_norm;
+        T_value energy_joules;
         long assemble_time;
         long transfer_time;
         long solve_time;

@@ -13,6 +13,7 @@
 #include "include/IO.hpp"
 #include "include/model.hpp"
 #include "include/ComputeModel.hpp"
+#include "include/Solver.hpp"
 
 #include <ginkgo/ginkgo.hpp>
 
@@ -37,14 +38,9 @@ int main(int argc, char* argv[])  {
 
     nvmlInit();
 
-    nvmlDevice_t device;
-    nvmlDeviceGetHandleByIndex(0, &device);
-    unsigned long long energy_start{0}, energy_end{0};
 
     // read input
     ReadVTK(model_name, poissfem_model);
-
-
 
 
     //******************************************
@@ -56,95 +52,16 @@ int main(int argc, char* argv[])  {
     auto assemble_end = std::chrono::steady_clock::now();
     long assemble_time = std::chrono::duration_cast<std::chrono::microseconds>(assemble_end - assemble_begin).count();
     
-
-    //******************************************
-    //*  Solver part in ginkgo :)
-    //******************************************
-    std::shared_ptr<gko::Executor> exec;
-    if (gko::CudaExecutor::get_num_devices() > 0) {
-        exec = gko::CudaExecutor::create(0, gko::ReferenceExecutor::create());
-    } else {
-        exec = gko::ReferenceExecutor::create();
-    }
-
-    auto logger = gko::share(
-        gko::log::Stream<value_type>::create(
-            gko::log::Logger::all_events_mask,
-            std::cout
-        )
-    );
+    /*************************************
+    * Solver part in ginkgo. 
+    *************************************/
+    x0.assign(A.n_rows, 0.0f); // initial guess is zero for internal nodes, boundary nodes are not part of the system
+    simple_logger custom_simple_logger = solveGinkgo<index_type, value_type>(poissfem_model, A, b, x0);
 
 
-    exec->synchronize();
-
-    auto transfer_start = std::chrono::steady_clock::now();
-
-    auto gko_A = gko::share(
-        gko::matrix::Csr<value_type, index_type>::create(
-            exec,
-            gko::dim<2>{A.n_rows, A.n_cols},
-            gko::array<value_type>::view(exec, A.n_nonzero, A.values.data()),
-            gko::array<index_type>::view(exec, A.n_nonzero, A.col_ind.data()),
-            gko::array<index_type>::view(exec, A.n_rows + 1, A.row_ptr.data())
-        )
-    );
-
-    exec->synchronize();
-    auto transfer_end = std::chrono::steady_clock::now();
-
-
-    x0.assign(A.n_rows, 0.0);
-
-    auto gko_b = gko::share(
-        gko::matrix::Dense<value_type>::create(
-            exec,
-            gko::dim<2>{A.n_rows, 1},
-            gko::array<value_type>::view(exec, b.size(), b.data()),
-            1
-        )
-    );
-
-    auto gko_x = gko::share(
-        gko::matrix::Dense<value_type>::create(
-            exec,
-            gko::dim<2>{A.n_rows, 1},
-            gko::array<value_type>::view(exec, x0.size(), x0.data()),
-            1
-        )
-    );
-
-    auto solver_gen = gko::solver::Cg<value_type>::build()
-        .with_criteria(
-            gko::stop::Iteration::build()
-                .with_max_iters(1000)
-                .on(exec),
-            gko::stop::ResidualNorm<value_type>::build()
-                .with_reduction_factor(1e-6)
-                .on(exec)
-        )
-        .with_preconditioner(
-            gko::preconditioner::Jacobi<value_type>::build().on(exec)
-        )
-        .on(exec);
-
-
-
-    auto solver = solver_gen->generate(gko_A);
-
-
-    exec->synchronize();
-
-    nvmlDeviceGetTotalEnergyConsumption(device, &energy_start);
-    auto solve_start = std::chrono::steady_clock::now();
-    solver->apply(gko_b, gko_x);
-    exec->synchronize();
-    auto solve_end = std::chrono::steady_clock::now();
-    nvmlDeviceGetTotalEnergyConsumption(device, &energy_end);
-
-
-    long transfer_time = std::chrono::duration_cast<std::chrono::microseconds>(transfer_end - transfer_start).count();
-    long solve_time = std::chrono::duration_cast<std::chrono::microseconds>(solve_end - solve_start).count();
-
+    long transfer_time = custom_simple_logger.transfer_duration;
+    long solve_time = custom_simple_logger.solve_duration;
+    float energy_joules = custom_simple_logger.energy_joules;
 
     std::vector<index_type> boundary_nodes = extract_boundary_nodes<index_type, value_type>(poissfem_model);
 
@@ -152,6 +69,7 @@ int main(int argc, char* argv[])  {
     x_analytical.assign(x0.size(), 0);
 
 
+    
     std::vector<bool> is_boundary(poissfem_model.n_vertices, false);
     for (index_type idx : boundary_nodes) {
         is_boundary[idx] = true;
@@ -252,11 +170,11 @@ int main(int argc, char* argv[])  {
         WriteVector<index_type, value_type>(x0, model_name, "x0");
     }
 
-    Report<index_type, value_type> run_report{poissfem_model.n_vertices, A.n_nonzero, max_edge_length, l2_error, assemble_time, transfer_time, solve_time};
+    Report<index_type, value_type> run_report{poissfem_model.n_vertices, A.n_nonzero, max_edge_length, 
+                                                l2_error, energy_joules, assemble_time, transfer_time, solve_time, 
+                                                };
 
 
-    double energy_joules = (energy_end - energy_start) / 1000.0;
-    std::cout << "Total energy consumption during solve: " << energy_joules << " Joules" << std::endl;
     print_report<index_type, value_type>(model_name, run_report, "");
 
     write_vtu<index_type, value_type>(model_name, poissfem_model);

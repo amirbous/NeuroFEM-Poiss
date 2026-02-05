@@ -33,6 +33,7 @@ void print_report(std::string problem_name, const Report<T_index, T_value> repor
         std::cout << std::right << std::setw(15) << report.n_nonzero <<",";
         std::cout << std::right << std::setw(15) << std::fixed << std::setprecision(6) << report.max_edge_length <<",";
         std::cout << std::right << std::setw(15) << std::fixed << std::setprecision(6) << report.residual_norm << ",";
+        std::cout << std::right << std::setw(15) << std::fixed << std::setprecision(6) << report.energy_joules << ",";
         std::cout << std::right << std::setw(15) << std::fixed << std::setprecision(6) << report.assemble_time << ",";
         std::cout << std::right << std::setw(15) << std::fixed << std::setprecision(6) << report.transfer_time << ",";
         std::cout << std::right << std::setw(15) << std::fixed << std::setprecision(6) << report.solve_time;
