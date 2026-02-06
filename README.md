@@ -6,12 +6,26 @@ The project covers a FEM problem matrix generation program in C++, and matrix so
 
 The problem matrices are then used for the Neuromorphic hardware study on the Spinnaker2
 
-### Important features
+### Repo structure 
 
-### Different parts of the repository
+Each of the subdirectories includes its own readme. Different functionalities are split over the directories therefore each subdirectory has its own readme explaining the functionality and the setup of the projects part-
 
 
-### Setup and usage
+
+
+### current state and TODO checks
+
+Realized so far:
+
+- [x] Framework to generate first order FEM for poisson problem with tetrahedra (3D) discretization
+- [x] sparse matrices GPU solver using Ginkgo
+- [x] pipeline for off solving on spinnaker2
+
+Next steps 
+
+- [] Numerical discussion
+
+
 
 
 ### 

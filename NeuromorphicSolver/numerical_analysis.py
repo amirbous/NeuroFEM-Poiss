@@ -15,6 +15,20 @@ import re
 import time
 
 
+def convergence_diagnostic(rho, noise_estimate=1e-6):
+    amplification = 1.0 / (1.0 - rho)
+    steady_error = amplification * noise_estimate
+
+    print("\n--- Practical convergence diagnostic ---")
+    print(f"rho = {rho:.6f}")
+    print(f"noise amplification ≈ {amplification:.2f}x")
+    print(f"estimated steady error ≈ {steady_error:.2e}")
+
+    if amplification > 100:
+        print("⚠ Slow contraction — hardware noise sensitive")
+    else:
+        print("✓ Robust contraction")
+
 
 
 def neurofem_quantization_check(A, A_quant, scale, dt=None):
@@ -57,6 +71,7 @@ def neurofem_quantization_check(A, A_quant, scale, dt=None):
             print("✓ Discrete dynamics stable")
 
     print("--- end check ---\n")
+    convergence_diagnostic(rho, 1e-6)
 
 
 ##########################################
@@ -91,25 +106,10 @@ def float_to_signed_sparse(matrix, x_bits=6, scale=None):
 
 
 
-# Main pipeline functions
-
-OID_POWER   = '1.3.6.1.4.1.62531.1.10.1.3.1'  # power in W
-OID_TEMPERATURE = '1.3.6.1.4.1.62531.1.10.1.2.1'  # temperature in C
-
-def snmp_get(ip, oid):
-    cmd = ["snmpget", "-v2c", "-c", "public", ip, oid]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        return None
-    match = re.search(r":\s+(-?\d+)", result.stdout)
-    if not match:
-        return None
-    return int(match.group(1))
-
 
 
 # IO read matrix
-def LoadCSRMatrix(model_name="", data_dir="../../data/"):
+def LoadCSRMatrix(model_name="", data_dir="../../data"):
     
     model_matrix_filename = f"{data_dir}/matrix/{model_name}_mtx.txt"
     model_rhs_filename = f"{data_dir}/matrix/{model_name}_rhs.txt"
@@ -169,7 +169,7 @@ def main():
     print("Starting CSR to SNN pipeline...")
 
     #1. Load CSR Matrix and RHS
-    A_csr, b = LoadCSRMatrix(model_name)
+    A_csr, b = LoadCSRMatrix(model_name, "../data")
     n_mesh = A_csr.shape[0]
 
     print("1. Loaded matrix and RHS.")
@@ -184,7 +184,7 @@ def main():
     num_timesteps = 10000              # timesteps
     sys_tick_in_s = 1e-3              # (default is 1 ms)
 
-    gamma = 10.0                      # neuron gain
+    gamma = 1e-5                      # neuron gain
     
     
     theta = 0.5 * (gamma ** 2)        # neuron spike threshold
@@ -220,8 +220,8 @@ def main():
         "steady_state": steady_state, # Global param
         "npm": npm
     }
-
-    neurofem_quantization_check(A_csr, A_quant, A_scale, dt);
+    # print the log and properties for a matrix
+    neurofem_quantization_check(A_csr, A_quant, A_scale, dt)
 
 
 if __name__ == "__main__":      
