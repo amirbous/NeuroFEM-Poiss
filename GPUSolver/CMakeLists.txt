@@ -24,7 +24,15 @@ find_package(OpenMP REQUIRED)
 set(Ginkgo_DIR "/usr/local/lib/cmake/Ginkgo")
 find_package(Ginkgo REQUIRED)
 
-
+# CLI11 (header-only)
+include(FetchContent)
+FetchContent_Declare(
+  cli11
+  GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+  GIT_TAG        v2.4.2
+)
+FetchContent_MakeAvailable(cli11)
+target_link_libraries(${TARGET_EXE} PRIVATE CLI11::CLI11)
 #find_library(CUDSS_LIB NAMES cudss) in case cudss instead of ginkgo
 
 

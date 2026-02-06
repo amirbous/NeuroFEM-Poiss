@@ -18,7 +18,7 @@
 
 template<typename T_index, typename T_value>
 simple_logger solveGinkgo(struct Model<T_index, T_value>& model, struct CSR_matrix<T_index, T_value>& A, std::vector<T_value>& b, std::vector<T_value>& x0) {
- 
+    nvmlInit();
     nvmlDevice_t device;
     nvmlDeviceGetHandleByIndex(0, &device);
     unsigned long long energy_start{0}, energy_end{0};

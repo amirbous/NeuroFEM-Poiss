@@ -7,8 +7,8 @@ last_problem=$((number_of_problems - 1))
 
 
 echo ${last_problem}
-echo "   problem_name,  n_vertices,  num_non_zeros,   max_e_length,    l2_res_norm"
-
+echo "   problem_name,  n_vertices,  num_non_zeros,   max_e_length,   
+             l2_res_norm, energy(J), assemble_time(ms), ransfer_time(ms), solve_time(ms)"
 
 
     
@@ -18,6 +18,5 @@ for repeat in $(seq 1 5); do
     ./poissfem ${complete_name} ${write_data}
 
 done
-    
     
 done

@@ -19,7 +19,7 @@ The program stricly takes input meshes in VTK unstructured grid v5.1 with first 
 
 * Configuration and building
 
-This project relies on Ginkgo, which should be installed already on the system ( check https://github.com/ginkgo-project/ginkgo for installation details )
+This project relies on Ginkgo, which should be installed already on the system ( check https://github.com/ginkgo-project/ginkgo for installation instructions )
 
 For the first cmake call, specify Ginkgo installation directory. It is set with variable `Ginkgo_DIR` in the cmake files.
 
@@ -31,17 +31,17 @@ For the first cmake call, specify Ginkgo installation directory. It is set with 
 
 the program resulted binary is called `poissfem`. It takes the following command line arguments
 
-Running `poissfem`
-
-* first argument: `<problem name>`. The program expects to find a mesh file with the same problem name under `data/mesh` 
+* first argument optional: `<problem name>`. The program expects to find a mesh file with the same problem name under `data/mesh` 
 
 * `-w <write_option>`: whether to write the solver data to a files.
   - 0: No write - the matrix and RHS are written to files after the run is complete
   - 1: Yes write - the matrix and RHS are written to files
 
-On top of the `poissfem` binary, a Convergence benchmark script is provided `Convergence.sh` which performs scaling tests
+* `-m <pre-assembled matrix mode>`: whether to assemble the matrix from scratch or fetch it from the matrices directory
+  - 0: no prefetch - built the matrix from scratch
+  - 1: matrix file exist - skip building and prefetch
 
-* Output
+On top of the `poissfem` binary, a Convergence benchmark script is provided `Convergence.sh` which performs scaling tests
 
 - The prints one log line that contains the run information. The lines are appended for benchmark tests to have coherent benchmark log reports.
 

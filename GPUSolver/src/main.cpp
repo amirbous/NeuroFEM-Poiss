@@ -7,8 +7,9 @@
 #include <algorithm>
 #include <memory>
 
-// cuda stuff
-#include <nvml.h>
+#include <CLI/CLI.hpp>
+
+
 
 #include "include/IO.hpp"
 #include "include/model.hpp"
@@ -20,24 +21,45 @@
 
 int main(int argc, char* argv[])  {
 
+    CLI::App app{"APU FEM solver with CLI"};
+    
     using index_type = int;
     using value_type = float;
 
-    bool write_matrix = false;
-
-    std::string model_name{};
-
+    
     Model<index_type, value_type> poissfem_model;
     CSR_matrix<index_type, value_type> A;
 
     std::vector<value_type> b; // we still don't know the size, given the sparsity pattern but will be decided in initialize_CSR_indices
     std::vector<value_type> x0; // solution vector
-    model_name = (argc > 1 ? argv[1] : "Sphere_00");
-    write_matrix = (argc > 2 ? (std::string(argv[2]) == "1" ? true : false) : false);
+
+    std::string model_name = "Sphere_00";
+    app.add_option("model_name", model_name, "Problem name")
+       ->capture_default_str()
+       ->expected(1);
+
+    int mode = 0;
+    app.add_option("-m,--mode", mode, "Mode flag (0: false, 1: true)")
+    ->capture_default_str()
+    ->expected(1);
+
+    int write_matrix = 0;
+    app.add_option("-w,--write", write_matrix, "Write matrix flag (0: false, 1: true)")
+    ->capture_default_str()
+    ->expected(1);
 
 
-    nvmlInit();
 
+
+    CLI11_PARSE(app, argc, argv);
+
+
+    if(mode) {
+        std::cout << "Feature still not implemented, please refrain from using prefetching mode" << std::endl;
+        std::cerr << "Error, feature still not implemented" << std::endl;
+        exit(1);
+
+    }
 
     // read input
     ReadVTK(model_name, poissfem_model);
