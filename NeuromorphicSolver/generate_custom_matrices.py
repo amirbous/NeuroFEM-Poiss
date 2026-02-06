@@ -48,7 +48,7 @@ def generate_poisson_2d(nx, ny, save_path=None):
     X, Y = np.meshgrid(x, y)
     b = np.sin(np.pi * X.ravel()) * np.sin(np.pi * Y.ravel())
     
-    # Scale to similar magnitude as your problems
+    # Scale to low magnitude
     b = b * 1e-3
     
     if save_path:

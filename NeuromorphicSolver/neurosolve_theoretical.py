@@ -9,8 +9,6 @@ import sys
 import os
 
 
-
-
 #########################################################
 ################@Copyright from sandilabs################
 #########################################################
@@ -312,14 +310,9 @@ def complete_run_neurofem_history(A, b, npm, timesteps):
         # Update the estimated solution for the current step
         output[:, step] = (1 - dt * lambda_d) * output[:, step-1] + gamma.dot(spikes[:, 0])
 
-        # NEW: Calculate and store the error for the current step
-        # x_estimated at this step is simply output[:, step]
         if 'x0' in globals():
             error_history[step] = np.linalg.norm(output[:, step] - x0, ord=2)
 
-    # Returns:
-    # 1. output: The full matrix of size (N_interior, timesteps). output[:, i] is x_estimated at step i.
-    # 2. error_history: Array of size (timesteps,) containing the L2 norm error at each step.
     return output, error_history
 
 
@@ -352,6 +345,8 @@ if write_results:
             print(f"{j};{err_hist[j]}", file=f)
 
     print("Results written successfully.")
+
+
 
 ##################################################################
 # In case this is used for a convergence history

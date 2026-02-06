@@ -22,9 +22,12 @@ A step by step guilde:
 
 
 * building neurofem_2048 
-1. Given the py-spinnaker2 folder, with the complete `libs/` correctly placed under `src/spinnaker2/`, we place `neurofem_2048` under `py-spinnaker2/src/spinnaker2/libs/chip/app-pe/s2app`. then go to `py-spinnaker2/src/spinnaker2/libs/chip/appe-pe`, make clean and run `make ROUTING_SETTINGS="C2C_ROUTING` to build neurofem_2048 with the correct flags.
+1. Given the py-spinnaker2 folder, with the complete `libs/` correctly placed under `src/spinnaker2/`, we place `neurofem_2048` under `py-spinnaker2/src/spinnaker2/libs/chip/app-pe/s2app`. 
+2. Go to `py-spinnaker2/src/spinnaker2/libs/chip/appe-pe`, make clean and run `make ROUTING_SETTINGS="C2C_ROUTING` to build neurofem_2048 with the correct flags.
 
-After that, go to `setup.py` in py-spinnaker2 and add `neurofem_2048` in the models list to setup.
+3. The neurofem model should be added to the list of models in `py-spinnaker2` models list. For that:
+- in `py-spinnaker2/setup.py` in py-spinnaker2 and add `neurofem_2048` in the models list to setup.
+- in `py-spinnaker2/src/spinnaker2/mapper.py` in `APP_PATH_IN_LIB` array add the following iterm as one line ` "neurofem_2048": "neurofem_2048/binaries/s2app_arm.mem" `
 
 From there the rest of the installation is the same like in the moodle.
 
@@ -33,6 +36,8 @@ From there the rest of the installation is the same like in the moodle.
 ### Relevant files and usage
 
 All data is loaded from the root data/ folder. Only problem name is required, and the scripts retrieve the data from the upper directory. 
+
+In all these scipts, a first command argument is `<problem name>`, the files are then fetched from `data/` at the root of the repository. 
 
 * `CSR2SNN_pipeline`: main file that executes the pipeline and solve on the Spinnaker2 chip.
 * `numerical analysis`: python3 script that takes a problem name as first single command line argument and runs a numerical analysis on the matrix, in order to estimate whether the chip will converge or not. 
