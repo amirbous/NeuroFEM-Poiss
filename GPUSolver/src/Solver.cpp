@@ -15,19 +15,30 @@
 
 #include <ginkgo/ginkgo.hpp>
 
-
 template<typename T_index, typename T_value>
-simple_logger solveGinkgo(struct Model<T_index, T_value>& model, struct CSR_matrix<T_index, T_value>& A, std::vector<T_value>& b, std::vector<T_value>& x0) {
-    nvmlInit();
+simple_logger solveGinkgo(struct Model<T_index, T_value>& model, 
+                         struct CSR_matrix<T_index, T_value>& A, 
+                         std::vector<T_value>& b, 
+                         std::vector<T_value>& x0, 
+                         int use_gpu) {
+    
     nvmlDevice_t device;
-    nvmlDeviceGetHandleByIndex(0, &device);
     unsigned long long energy_start{0}, energy_end{0};
 
+    // Only initialize NVML if we are actually using the GPU
+    if (use_gpu) {
+        nvmlInit();
+        nvmlDeviceGetHandleByIndex(0, &device);
+    }
 
-        std::shared_ptr<gko::Executor> exec;
-    if (gko::CudaExecutor::get_num_devices() > 0) {
+    std::shared_ptr<gko::Executor> exec;
+    
+    // Logic for Executor selection based on use_gpu flag
+    if (use_gpu && gko::CudaExecutor::get_num_devices() > 0) {
+        std::cout << "Using CUDA executor." << std::endl;
         exec = gko::CudaExecutor::create(0, gko::ReferenceExecutor::create());
     } else {
+        std::cout << "Using Reference (CPU) executor." << std::endl;
         exec = gko::ReferenceExecutor::create();
     }
 
@@ -38,9 +49,7 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model, struct CSR_matr
         )
     );
 
-
     exec->synchronize();
-
     auto transfer_start = std::chrono::steady_clock::now();
 
     auto gko_A = gko::share(
@@ -55,9 +64,6 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model, struct CSR_matr
 
     exec->synchronize();
     auto transfer_end = std::chrono::steady_clock::now();
-
-
-
 
     auto gko_b = gko::share(
         gko::matrix::Dense<T_value>::create(
@@ -91,23 +97,42 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model, struct CSR_matr
         )
         .on(exec);
 
-
-
     auto solver = solver_gen->generate(gko_A);
-
 
     exec->synchronize();
 
-    nvmlDeviceGetTotalEnergyConsumption(device, &energy_start);
+    // Conditional energy measurement start
+    if (use_gpu) {
+        nvmlDeviceGetTotalEnergyConsumption(device, &energy_start);
+    }
+
     auto solve_start = std::chrono::steady_clock::now();
     solver->apply(gko_b, gko_x);
     exec->synchronize();
     auto solve_end = std::chrono::steady_clock::now();
-    nvmlDeviceGetTotalEnergyConsumption(device, &energy_end);
+
+    // Conditional energy measurement end
+    if (use_gpu) {
+        nvmlDeviceGetTotalEnergyConsumption(device, &energy_end);
+        nvmlShutdown(); // Clean up NVML
+    }
+
+    double energy_mJ = (use_gpu) ? static_cast<double>(energy_end - energy_start) : 0.0;
+    double solve_time_s = std::chrono::duration<double>(solve_end - solve_start).count();
+
+    if (use_gpu) {
+        std::cout << "Solver finished. Energy consumed: " << energy_mJ << " mJ" << std::endl;
+        std::cout << "Power consumption: " << energy_mJ / solve_time_s << " mW" << std::endl;
+    }
 
     auto solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(solve_end - solve_start).count();
     auto transfer_duration = std::chrono::duration_cast<std::chrono::milliseconds>(transfer_end - transfer_start).count();
-    return {transfer_duration, solve_duration, static_cast<float>(energy_end - energy_start)};
+    
+    return {
+        static_cast<float>(transfer_duration), 
+        static_cast<float>(solve_duration), 
+        static_cast<float>(energy_mJ) // Returns 0 if CPU
+    };
 }
 
 template simple_logger
@@ -115,7 +140,8 @@ solveGinkgo<int, float>(
     Model<int, float>&,
     CSR_matrix<int, float>&,
     std::vector<float>&,
-    std::vector<float>&
+    std::vector<float>&, 
+    int use_gpu
 );
 
 template simple_logger
@@ -123,5 +149,6 @@ solveGinkgo<int, double>(
     Model<int, double>&,
     CSR_matrix<int, double>&,
     std::vector<double>&,
-    std::vector<double>&
+    std::vector<double>&, 
+    int use_gpu
 );

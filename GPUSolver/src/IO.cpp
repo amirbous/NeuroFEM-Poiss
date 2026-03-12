@@ -318,7 +318,9 @@ template<typename T_index, typename T_value>
 std::vector<T_value> ReadVector(const std::string model_name, const std::string vector_file_desc) {
     std::ifstream fstream;
     std::string fname = model_name + "_" + vector_file_desc + ".txt";
-    fstream.open(fname);
+
+    std::string filepath = "data/matrix/" + fname;
+    fstream.open(filepath);
 
     if (!fstream.is_open()) {
         std::cerr << "Error: Could not open RHS file " << fname << std::endl;
@@ -336,6 +338,7 @@ std::vector<T_value> ReadVector(const std::string model_name, const std::string 
     fstream.close();
     return x;
 }
+
 
 template<typename T_index, typename T_value>
 void WriteCSRMatrix(const CSR_matrix<T_index, T_value> &A, std::string model_name) {
@@ -370,6 +373,74 @@ void WriteCSRMatrix(const CSR_matrix<T_index, T_value> &A, std::string model_nam
 
     fstream.close();
 }
+
+
+template<typename T_index, typename T_value>
+void readCOOMatrix(const std::string filename, CSR_matrix<T_index, T_value> &A) {
+    std::string filepath = "data/matrix/" + filename;
+    std::ifstream fstream(filepath);
+
+    if (!fstream.is_open()) {
+        std::cerr << "Error: Could not open COO matrix file " << filename << std::endl;
+        return;
+    }
+
+    int n_rows, n_cols, n_nonzero;
+    // Read the header: rows, columns, non-zeros
+    if (!(fstream >> n_rows >> n_cols >> n_nonzero)) {
+        std::cerr << "Error: Could not read matrix header." << std::endl;
+        return;
+    }
+
+    // Initialize the CSR matrix using your existing constructor
+    A = CSR_matrix<T_index, T_value>(n_rows, n_cols, n_nonzero);
+
+    // Temporary arrays to hold the COO data
+    std::vector<T_index> coo_row(n_nonzero);
+    std::vector<T_index> coo_col(n_nonzero);
+    std::vector<T_value> coo_val(n_nonzero);
+    
+    // Array to track how many non-zeros exist per row
+    std::vector<T_index> nnz_per_row(n_rows, 0);
+
+    for (int i = 0; i < n_nonzero; ++i) {
+        T_index r, c;
+        T_value v;
+        fstream >> r >> c >> v;
+
+        // Convert 1-based index from the file to 0-based index for C++
+        r--;
+        c--;
+
+        coo_row[i] = r;
+        coo_col[i] = c;
+        coo_val[i] = v;
+
+        nnz_per_row[r]++;
+    }
+
+    // 1. Compute row_ptr using a prefix sum
+    A.row_ptr[0] = 0;
+    for (int i = 0; i < n_rows; ++i) {
+        A.row_ptr[i + 1] = A.row_ptr[i] + nnz_per_row[i];
+    }
+
+    // 2. Scatter the COO data into the CSR arrays
+    // We make a copy of row_ptr to track insertion offsets dynamically 
+    std::vector<T_index> current_row_offset = A.row_ptr;
+
+    for (int i = 0; i < n_nonzero; ++i) {
+        T_index r = coo_row[i];
+        T_index dest = current_row_offset[r]++;
+        A.col_ind[dest] = coo_col[i];
+        A.values[dest] = coo_val[i];
+    }
+
+    fstream.close();
+}
+
+template void readCOOMatrix<int, float>(const std::string filename, CSR_matrix<int, float> &A);
+template void readCOOMatrix<int, double>(const std::string filename, CSR_matrix<int, double> &A);
 
 
 template void ReadVTK<int, float>(std::string model_name, Model<int, float> &model);

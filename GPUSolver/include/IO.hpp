@@ -31,4 +31,7 @@ template<typename T_index, typename T_value>
 void print_report(std::string problem_name, Report<T_index, T_value>, std::string log_file);
 
 
+template<typename T_index, typename T_value>
+void readCOOMatrix(const std::string filename, CSR_matrix<T_index, T_value> &A);
+
 #endif
