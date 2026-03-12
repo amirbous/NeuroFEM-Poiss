@@ -15,6 +15,7 @@
 
 #include <ginkgo/ginkgo.hpp>
 
+
 template<typename T_index, typename T_value>
 simple_logger solveGinkgo(struct Model<T_index, T_value>& model, 
                          struct CSR_matrix<T_index, T_value>& A, 
@@ -25,15 +26,13 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model,
     nvmlDevice_t device;
     unsigned long long energy_start{0}, energy_end{0};
 
-    // Only initialize NVML if we are actually using the GPU
     if (use_gpu) {
         nvmlInit();
         nvmlDeviceGetHandleByIndex(0, &device);
     }
 
     std::shared_ptr<gko::Executor> exec;
-    
-    // Logic for Executor selection based on use_gpu flag
+
     if (use_gpu && gko::CudaExecutor::get_num_devices() > 0) {
         std::cout << "Using CUDA executor." << std::endl;
         exec = gko::CudaExecutor::create(0, gko::ReferenceExecutor::create());
@@ -41,6 +40,8 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model,
         std::cout << "Using Reference (CPU) executor." << std::endl;
         exec = gko::ReferenceExecutor::create();
     }
+
+    auto host = gko::ReferenceExecutor::create();
 
     auto logger = gko::share(
         gko::log::Stream<T_value>::create(
@@ -52,36 +53,40 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model,
     exec->synchronize();
     auto transfer_start = std::chrono::steady_clock::now();
 
-    auto gko_A = gko::share(
-        gko::matrix::Csr<T_value, T_index>::create(
-            exec,
-            gko::dim<2>{A.n_rows, A.n_cols},
-            gko::array<T_value>::view(exec, A.n_nonzero, A.values.data()),
-            gko::array<T_index>::view(exec, A.n_nonzero, A.col_ind.data()),
-            gko::array<T_index>::view(exec, A.n_rows + 1, A.row_ptr.data())
-        )
-    );
+    /* ---- FIX: construct matrix on host then clone to executor ---- */
+
+auto gko_A_host = gko::matrix::Csr<T_value, T_index>::create(
+    host,
+    gko::dim<2>{A.n_rows, A.n_cols},
+    gko::array<T_value>::view(host, A.n_nonzero, A.values.data()),
+    gko::array<T_index>::view(host, A.n_nonzero, A.col_ind.data()),
+    gko::array<T_index>::view(host, A.n_rows + 1, A.row_ptr.data())
+);
+
+auto gko_A = gko::share(gko::clone(exec, gko_A_host));
+
+auto gko_b_host = gko::matrix::Dense<T_value>::create(
+    host,
+    gko::dim<2>{A.n_rows, 1},
+    gko::array<T_value>::view(host, b.size(), b.data()),
+    1
+);
+
+auto gko_x_host = gko::matrix::Dense<T_value>::create(
+    host,
+    gko::dim<2>{A.n_rows, 1},
+    gko::array<T_value>::view(host, x0.size(), x0.data()),
+    1
+);
+
+auto gko_b = gko::share(gko::clone(exec, gko_b_host));
+auto gko_x = gko::share(gko::clone(exec, gko_x_host));
+
 
     exec->synchronize();
     auto transfer_end = std::chrono::steady_clock::now();
 
-    auto gko_b = gko::share(
-        gko::matrix::Dense<T_value>::create(
-            exec,
-            gko::dim<2>{A.n_rows, 1},
-            gko::array<T_value>::view(exec, b.size(), b.data()),
-            1
-        )
-    );
-
-    auto gko_x = gko::share(
-        gko::matrix::Dense<T_value>::create(
-            exec,
-            gko::dim<2>{A.n_rows, 1},
-            gko::array<T_value>::view(exec, x0.size(), x0.data()),
-            1
-        )
-    );
+    /* -------------------------------------------------------------- */
 
     auto solver_gen = gko::solver::Cg<T_value>::build()
         .with_criteria(
@@ -101,21 +106,32 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model,
 
     exec->synchronize();
 
-    // Conditional energy measurement start
     if (use_gpu) {
         nvmlDeviceGetTotalEnergyConsumption(device, &energy_start);
     }
 
     auto solve_start = std::chrono::steady_clock::now();
+
     solver->apply(gko_b, gko_x);
+
     exec->synchronize();
     auto solve_end = std::chrono::steady_clock::now();
 
-    // Conditional energy measurement end
     if (use_gpu) {
         nvmlDeviceGetTotalEnergyConsumption(device, &energy_end);
-        nvmlShutdown(); // Clean up NVML
+        nvmlShutdown();
     }
+
+    /* ---- copy solution back to host vector x0 ---- */
+
+    auto gko_x_result = gko::clone(host, gko_x);
+    auto vals = gko_x_result->get_values();
+
+    for (size_t i = 0; i < x0.size(); ++i) {
+        x0[i] = vals[i];
+    }
+
+    /* ---------------------------------------------- */
 
     double energy_mJ = (use_gpu) ? static_cast<double>(energy_end - energy_start) : 0.0;
     double solve_time_s = std::chrono::duration<double>(solve_end - solve_start).count();
@@ -131,7 +147,7 @@ simple_logger solveGinkgo(struct Model<T_index, T_value>& model,
     return {
         static_cast<float>(transfer_duration), 
         static_cast<float>(solve_duration), 
-        static_cast<float>(energy_mJ) // Returns 0 if CPU
+        static_cast<float>(energy_mJ)
     };
 }
 

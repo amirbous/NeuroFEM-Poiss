@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-
 project(APU_FEM VERSION 1.0.0 LANGUAGES CXX CUDA)
-
-
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
@@ -17,12 +14,16 @@ set(SOURCES src/main.cpp src/IO.cpp src/ComputeModel.cpp src/Solver.cpp)
 
 add_executable(${TARGET_EXE} ${SOURCES})
 
-find_library(NVML_LIBRARY nvidia-ml)
+# CUDA and OpenMP
 find_package(CUDAToolkit REQUIRED)
 find_package(OpenMP REQUIRED)
 
-set(Ginkgo_DIR "/usr/local/lib/cmake/Ginkgo")
+# Ginkgo
+set(Ginkgo_DIR "/storage/home/abouslama/ginkgo/build/install/lib/cmake/Ginkgo")
 find_package(Ginkgo REQUIRED)
+
+# NVML library (explicit path to CUDA stubs)
+set(NVML_LIBRARY "/usr/local/cuda/lib64/stubs/libnvidia-ml.so")
 
 # CLI11 (header-only)
 include(FetchContent)
@@ -32,29 +33,33 @@ FetchContent_Declare(
   GIT_TAG        v2.4.2
 )
 FetchContent_MakeAvailable(cli11)
-target_link_libraries(${TARGET_EXE} PRIVATE CLI11::CLI11)
-#find_library(CUDSS_LIB NAMES cudss) in case cudss instead of ginkgo
 
-
+# Link libraries
 target_link_libraries(${TARGET_EXE} PRIVATE
     CUDA::cublas
     CUDA::cudart
     Ginkgo::ginkgo
     OpenMP::OpenMP_CXX
     ${NVML_LIBRARY}
+    CLI11::CLI11
 )
 
-target_include_directories(${TARGET_EXE} PRIVATE 
-    ${PROJECT_SOURCE_DIR} 
-    ${CUDSS_INCLUDE_DIR}
+# Include directories
+target_include_directories(${TARGET_EXE} PRIVATE
+    ${PROJECT_SOURCE_DIR}
+    # If you have cudss headers, set CUDSS_INCLUDE_DIR above
+    # ${CUDSS_INCLUDE_DIR}
 )
 
-target_compile_options(${TARGET_EXE} PRIVATE 
-    $<$<CONFIG:Debug>:-O0 -g3> 
+# Compile options
+target_compile_options(${TARGET_EXE} PRIVATE
+    $<$<CONFIG:Debug>:-O0 -g3>
 )
 
+# Output directory
 set_target_properties(${TARGET_EXE} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+# Copy data folder
 file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
